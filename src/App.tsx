@@ -37,10 +37,6 @@ import {
   Check
 } from 'lucide-react';
 import { cn } from './lib/utils';
-import { io } from 'socket.io-client';
-
-// Initialize socket connection
-const socket = io();
 
 // --- Types ---
 import { Language, TRANSLATIONS } from './translations';
@@ -101,36 +97,20 @@ export default function App() {
   const [submissions, setSubmissions] = useState<any[]>([]);
 
   useEffect(() => {
-    // Listen for initial data
-    socket.on('init', (data: any[]) => {
-      setSubmissions(data);
-    });
-
-    // Listen for new submissions from other users
-    socket.on('new_submission', (newSub: any) => {
-      setSubmissions(prev => {
-        // Avoid duplicates
-        if (prev.find(s => s.id === newSub.id)) return prev;
-        return [newSub, ...prev];
-      });
-    });
-
-    socket.on('ai_message_result', (msg: string) => {
-      setAiMessage(msg);
-      setLoadingAi(false);
-    });
-
-    socket.on('ai_message_error', (msg: string) => {
-      setAiMessage(msg);
-      setLoadingAi(false);
-    });
-
-    return () => {
-      socket.off('init');
-      socket.off('new_submission');
-      socket.off('ai_message_result');
-      socket.off('ai_message_error');
+    const fetchSubmissions = async () => {
+      try {
+        const res = await fetch('/api/submissions');
+        if (res.ok) {
+          const data = await res.json();
+          setSubmissions(data);
+        }
+      } catch (err) {
+        console.error("Fetch submissions error:", err);
+      }
     };
+    fetchSubmissions();
+    const interval = setInterval(fetchSubmissions, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
   }, []);
 
   // Donation Modal State: 'idle' (closed), 'form' (input), 'success' (thank you)
@@ -172,7 +152,7 @@ export default function App() {
    * Handles the donation form submission.
    * Validates inputs and transitions to the success step.
    */
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.phone || !formData.target) {
       alert("모든 정보를 입력해주세요.");
@@ -183,14 +163,36 @@ export default function App() {
       return;
     }
 
-    // Emit submission to server
-    socket.emit('submit', {
-      ...formData,
-      type: donationType
-    });
-
     setDonationStep('success');
     setLoadingAi(true);
+
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...formData,
+          type: donationType
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setSubmissions(prev => [data.submission, ...prev]);
+        }
+        setAiMessage(data.aiMessage);
+      } else {
+        setAiMessage("몽골의 미래를 위한 따뜻한 후원에 감사드립니다!");
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      setAiMessage("몽골의 미래를 위한 따뜻한 후원에 감사드립니다!");
+    } finally {
+      setLoadingAi(false);
+    }
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -205,19 +207,35 @@ export default function App() {
     }
   };
 
+  const performAdminAction = async (type: string, id: number) => {
+    try {
+      const res = await fetch('/api/admin_action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissions(data);
+      }
+    } catch (err) {
+      console.error("Admin action error:", err);
+    }
+  };
+
   const handleDeleteSubmission = (id: number) => {
-    socket.emit('admin_action', { type: 'delete', id });
+    performAdminAction('delete', id);
   };
 
   const handleRestoreSubmission = (id: number) => {
     if (confirm("복구하시겠습니까?")) {
-      socket.emit('admin_action', { type: 'restore', id });
+      performAdminAction('restore', id);
     }
   };
 
   const handlePermanentDeleteSubmission = (id: number) => {
     if (confirm("영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-      socket.emit('admin_action', { type: 'permanent_delete', id });
+      performAdminAction('permanent_delete', id);
     }
   };
 
