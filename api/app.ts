@@ -1,5 +1,5 @@
 import express from "express";
-import { neon } from '@neondatabase/serverless';
+import { createClient } from '@libsql/client';
 import { GoogleGenAI } from "@google/genai";
 import * as dotenv from 'dotenv';
 import fs from 'fs';
@@ -15,32 +15,35 @@ if (fs.existsSync('.env.local')) {
 // Initialize database
 let sql: any;
 try {
-    if (process.env.DATABASE_URL) {
-        sql = neon(process.env.DATABASE_URL);
+    if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+        sql = createClient({
+            url: process.env.TURSO_DATABASE_URL,
+            authToken: process.env.TURSO_AUTH_TOKEN
+        });
     } else {
-        console.warn("DATABASE_URL missing. Database will not function.");
+        console.warn("TURSO_DATABASE_URL missing. Database will not function.");
     }
 } catch (e) {
-    console.error("Neon DB Init error:", e);
+    console.error("Turso DB Init error:", e);
 }
 
 // Function to initialize table
 export async function initDB() {
     if (!sql) return;
     try {
-        await sql`
-      CREATE TABLE IF NOT EXISTS submissions (
-        id BIGINT PRIMARY KEY,
-        name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        target TEXT NOT NULL,
-        amount INTEGER NOT NULL,
-        message TEXT,
-        type TEXT NOT NULL,
-        date TEXT NOT NULL,
-        isDeleted INTEGER DEFAULT 0
-      )
-    `;
+        await sql.execute(`
+            CREATE TABLE IF NOT EXISTS submissions (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                target TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                message TEXT,
+                type TEXT NOT NULL,
+                date TEXT NOT NULL,
+                isDeleted INTEGER DEFAULT 0
+            )
+        `);
         console.log("Database initialized.");
     } catch (err) {
         console.error("Database table creation error:", err);
@@ -64,8 +67,8 @@ app.use(express.json());
 app.get("/api/submissions", async (req, res) => {
     if (sql) {
         try {
-            const rows = await sql`SELECT * FROM submissions ORDER BY id DESC`;
-            const allSubmissions = rows.map((row: any) => ({
+            const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
+            const allSubmissions = result.rows.map((row: any) => ({
                 ...row,
                 id: Number(row.id),
                 isDeleted: row.isdeleted === 1 || row.isdeleted === true
@@ -92,10 +95,11 @@ app.post("/api/submit", async (req, res) => {
 
     if (sql) {
         try {
-            await sql`
-        INSERT INTO submissions(id, name, phone, target, amount, message, type, date, isDeleted)
-        VALUES(${newSubmission.id}, ${newSubmission.name}, ${newSubmission.phone}, ${newSubmission.target}, ${newSubmission.amount}, ${newSubmission.message || ''}, ${newSubmission.type}, ${newSubmission.date}, ${newSubmission.isDeleted})
-      `;
+            await sql.execute({
+                sql: `INSERT INTO submissions(id, name, phone, target, amount, message, type, date, isDeleted)
+                      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                args: [newSubmission.id, newSubmission.name, newSubmission.phone, newSubmission.target, newSubmission.amount, newSubmission.message || '', newSubmission.type, newSubmission.date, newSubmission.isDeleted]
+            });
         } catch (err) {
             console.error("Database insert error:", err);
         }
@@ -141,15 +145,15 @@ app.post("/api/admin_action", async (req, res) => {
 
     try {
         if (data.type === 'delete') {
-            await sql`UPDATE submissions SET isDeleted = 1 WHERE id = ${data.id}`;
+            await sql.execute({ sql: `UPDATE submissions SET isDeleted = 1 WHERE id = ?`, args: [data.id] });
         } else if (data.type === 'restore') {
-            await sql`UPDATE submissions SET isDeleted = 0 WHERE id = ${data.id}`;
+            await sql.execute({ sql: `UPDATE submissions SET isDeleted = 0 WHERE id = ?`, args: [data.id] });
         } else if (data.type === 'permanent_delete') {
-            await sql`DELETE FROM submissions WHERE id = ${data.id}`;
+            await sql.execute({ sql: `DELETE FROM submissions WHERE id = ?`, args: [data.id] });
         }
 
-        const rows = await sql`SELECT * FROM submissions ORDER BY id DESC`;
-        const allSubmissions = rows.map((row: any) => ({
+        const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
+        const allSubmissions = result.rows.map((row: any) => ({
             ...row,
             id: Number(row.id),
             isDeleted: row.isdeleted === 1 || row.isdeleted === true
