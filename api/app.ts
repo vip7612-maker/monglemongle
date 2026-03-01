@@ -1,6 +1,7 @@
 import express from "express";
 import { createClient } from '@libsql/client';
 import { GoogleGenAI } from "@google/genai";
+import { google } from 'googleapis';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -162,6 +163,57 @@ app.post("/api/admin_action", async (req, res) => {
     } catch (err) {
         console.error("Admin action error:", err);
         res.status(500).json({ error: "Action failed" });
+    }
+});
+
+// API Route: Export all to Google Sheets
+app.post("/api/export-google-sheets", async (req, res) => {
+    if (!sql) {
+        res.status(500).json({ success: false, error: "Database not connected" });
+        return;
+    }
+
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
+        res.status(500).json({ success: false, error: "Google API credentials missing in environment variables" });
+        return;
+    }
+
+    try {
+        const auth = new google.auth.JWT(
+            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            undefined,
+            process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            ['https://www.googleapis.com/auth/spreadsheets']
+        );
+
+        const sheets = google.sheets({ version: 'v4', auth });
+        const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
+
+        const rows = result.rows.map((row: any) => [
+            row.date,
+            row.name,
+            row.phone,
+            row.target,
+            row.amount,
+            row.message || '',
+            row.type === 'commitment' ? '정기약정' : '일시후원',
+            row.isdeleted ? '삭제됨' : '활성'
+        ]);
+
+        const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
+        const values = [header, ...rows];
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: process.env.GOOGLE_SHEET_ID,
+            range: 'A1',
+            valueInputOption: 'RAW',
+            requestBody: { values },
+        });
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error("Google Sheets Sync Error:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

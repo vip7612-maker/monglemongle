@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, LogOut, CheckCircle2, RotateCcw, Trash2, Download } from 'lucide-react';
+import { Lock, LogOut, CheckCircle2, RotateCcw, Trash2, Download, Eye, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import * as XLSX from 'xlsx';
 
 export function Admin({
   showAdminLoginModal, setShowAdminLoginModal,
@@ -12,6 +13,48 @@ export function Admin({
   maskName,
   setIsAdminLoggedIn
 }: any) {
+  const [selectedSubmission, setSelectedSubmission] = React.useState<any>(null);
+
+  const handleExportExcel = () => {
+    const filtered = adminTab === 'trash'
+      ? submissions.filter((s: any) => s.isDeleted)
+      : submissions.filter((s: any) => s.type === adminTab && !s.isDeleted);
+
+    if (filtered.length === 0) {
+      alert("내보낼 데이터가 없습니다.");
+      return;
+    }
+
+    const dataToExport = filtered.map((s: any) => ({
+      "날짜": s.date,
+      "성함": s.name,
+      "연락처": s.phone,
+      "후원대상": s.target,
+      "금액": s.amount,
+      "메시지": s.message || "",
+      "유형": s.type === 'commitment' ? '정기약정' : '일시후원'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sponsors");
+    XLSX.writeFile(workbook, `mongle_sponsors_${adminTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleSyncGoogleSheets = async () => {
+    try {
+      const res = await fetch('/api/export-google-sheets', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert("구글 시트 동기화 성공!");
+      } else {
+        alert("동기화 실패: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("동기화 중 오류가 발생했습니다.");
+    }
+  };
   return (
     <>
       <AnimatePresence>
@@ -91,7 +134,20 @@ export function Admin({
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="font-serif text-3xl">후원자 관리 대시보드</h2>
-                <div className="flex gap-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleExportExcel}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#5A5A40]/5 hover:bg-[#5A5A40]/10 text-[#5A5A40] rounded-xl text-sm font-bold transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> 엑셀 다운로드
+                  </button>
+                  <button
+                    onClick={handleSyncGoogleSheets}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#4285F4]/10 hover:bg-[#4285F4]/20 text-[#4285F4] rounded-xl text-sm font-bold transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> 구글 시트 동기화
+                  </button>
+                  <div className="h-6 w-px bg-[#5A5A40]/10 mx-2" />
                   <button
                     onClick={() => {
                       setIsAdminLoggedIn(false);
@@ -187,6 +243,13 @@ export function Admin({
                           <td className="px-4 py-4 max-w-xs truncate">{s.message || '-'}</td>
                           <td className="px-4 py-4">
                             <div className="flex gap-3">
+                              <button
+                                onClick={() => setSelectedSubmission(s)}
+                                className="text-[#5A5A40] hover:text-[#4a4a35] transition-colors"
+                                title="상세보기"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
                               {adminTab === 'trash' ? (
                                 <>
                                   <button
@@ -220,6 +283,78 @@ export function Admin({
                     })()}
                   </tbody>
                 </table>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedSubmission && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedSubmission(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white w-full max-w-2xl rounded-[40px] p-10 shadow-2xl overflow-hidden"
+            >
+              <button
+                onClick={() => setSelectedSubmission(null)}
+                className="absolute top-8 right-8 text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#5A5A40]/5 text-[10px] font-bold uppercase tracking-widest text-[#5A5A40] mb-4">
+                  Submission Details
+                </div>
+                <h3 className="font-serif text-3xl">{selectedSubmission.name} 님의 후원 상세</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#5A5A40]/40 uppercase font-bold tracking-widest">날짜</div>
+                  <div className="font-medium">{selectedSubmission.date}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#5A5A40]/40 uppercase font-bold tracking-widest">연락처</div>
+                  <div className="font-medium">{selectedSubmission.phone}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#5A5A40]/40 uppercase font-bold tracking-widest">후원 대상</div>
+                  <div className="font-medium font-serif bg-[#5A5A40]/5 px-2 py-1 rounded-lg inline-block">
+                    {selectedSubmission.target}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#5A5A40]/40 uppercase font-bold tracking-widest">후원 금액</div>
+                  <div className="font-medium font-serif text-xl text-[#5A5A40]">
+                    {selectedSubmission.amount.toLocaleString()}원
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-6 bg-[#fdfcf8] rounded-3xl border border-[#5A5A40]/10">
+                <div className="text-[10px] text-[#5A5A40]/40 uppercase font-bold tracking-widest">응원 메시지</div>
+                <div className="text-[#5A5A40] leading-relaxed whitespace-pre-line text-lg italic">
+                  "{selectedSubmission.message || '메시지가 없습니다.'}"
+                </div>
+              </div>
+
+              <div className="mt-10">
+                <button
+                  onClick={() => setSelectedSubmission(null)}
+                  className="w-full py-4 bg-[#5A5A40] text-white rounded-full font-bold hover:bg-[#4a4a35] transition-colors"
+                >
+                  확인
+                </button>
               </div>
             </motion.div>
           </div>
