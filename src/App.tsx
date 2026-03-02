@@ -96,6 +96,20 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'commitment' | 'one-time' | 'trash'>('commitment');
   const [submissions, setSubmissions] = useState<any[]>([]);
 
+  const heroImages = [
+    '/mongolia_green_steppe.png',
+    '/mongolian_yurt_hills.png',
+    '/mongolian_river_valley.png',
+  ];
+  const [currentHeroImage, setCurrentHeroImage] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentHeroImage((prev) => (prev + 1) % heroImages.length);
+    }, 5000); // Cross-fade every 5 seconds
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
@@ -424,15 +438,21 @@ export default function App() {
             transition={{ duration: 1, delay: 0.2 }}
             className="relative"
           >
-            <div className="aspect-[4/5] rounded-[40px] overflow-hidden shadow-2xl relative z-10">
-              <img
-                src="https://picsum.photos/seed/mongolia/800/1000"
-                className="w-full h-full object-cover"
-                alt="Mongolia Landscape"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-8 left-8 right-8 text-white">
+            <div className="aspect-[4/5] rounded-[40px] overflow-hidden shadow-2xl relative z-10 bg-[#5A5A40]/20">
+              <AnimatePresence mode="popLayout">
+                <motion.img
+                  key={currentHeroImage}
+                  src={heroImages[currentHeroImage]}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.5 }}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt="Mongolia Landscape"
+                />
+              </AnimatePresence>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-20" />
+              <div className="absolute bottom-8 left-8 right-8 text-white z-30">
                 <div className="flex items-center gap-2 mb-2">
                   <MapPin className="w-4 h-4" />
                   <span className="text-sm font-medium">Ulaanbaatar, Mongolia</span>

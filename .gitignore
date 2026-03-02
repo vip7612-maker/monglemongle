@@ -8,3 +8,4 @@ coverage/
 !.env.example
 sponsors.db*
 .vercel
+.env*.local
