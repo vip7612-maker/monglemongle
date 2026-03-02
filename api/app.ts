@@ -174,51 +174,6 @@ app.post("/api/admin_action", async (req, res) => {
     }
 });
 
-// API Route: Debug Google Key Format
-app.get("/api/debug-key", async (req, res) => {
-    try {
-        let privateKeyPem: string;
-        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
-            const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
-            const creds = JSON.parse(jsonStr);
-            privateKeyPem = creds.private_key;
-        } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-            privateKeyPem = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-        } else {
-            return res.json({ error: "No key found" });
-        }
-
-        const b64 = privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----/g, '')
-            .replace(/-----END PRIVATE KEY-----/g, '')
-            .replace(/\\n/g, '')
-            .replace(/\s+/g, '');
-
-        let atobError = null;
-        try {
-            atob(b64);
-        } catch (e: any) {
-            atobError = e.message;
-        }
-
-        const invalidChars = [...b64].filter(c => !/[A-Za-z0-9+/=]/.test(c));
-
-        res.json({
-            keyLength: privateKeyPem.length,
-            b64Length: b64.length,
-            matchResult: !!b64.match(/.{1,64}/g),
-            atobSucceeded: !atobError,
-            atobError,
-            invalidCharsCount: invalidChars.length,
-            invalidCharsHex: invalidChars.map(c => c.charCodeAt(0).toString(16)),
-            invalidCharsString: invalidChars.join(''),
-            previewStart: b64.substring(0, 10),
-            previewEnd: b64.substring(b64.length - 10)
-        });
-    } catch (e: any) {
-        res.json({ error: e.message });
-    }
-});
-
 // API Route: Export all to Google Sheets
 app.post("/api/export-google-sheets", async (req, res) => {
     if (!sql) {
@@ -249,11 +204,12 @@ app.post("/api/export-google-sheets", async (req, res) => {
             return;
         }
 
-        // Robust PEM cleaning: extract base64, remove all whitespace, and rebuild clean PEM
-        const b64 = privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----/g, '')
-            .replace(/-----END PRIVATE KEY-----/g, '')
-            .replace(/\\n/g, '')
-            .replace(/\s+/g, '');
+        // Bulletproof PEM cleaning: literally remove everything that is not a Base64 character
+        let b64 = privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----/g, '')
+            .replace(/-----END PRIVATE KEY-----/g, '');
+        // Aggressively strip any non-base64 characters (including \n, \r, spaces, and anomalies like '{')
+        b64 = b64.replace(/[^A-Za-z0-9+/=]/g, '');
+
         const cleanPem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----\n`;
 
         // Use jose library to sign JWT (uses Web Crypto / crypto.subtle, avoids OpenSSL 3.0 issues)
