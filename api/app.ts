@@ -204,14 +204,16 @@ app.post("/api/export-google-sheets", async (req, res) => {
             return;
         }
 
-        // Clean the PEM key: ensure actual newlines, remove carriage returns
-        privateKeyPem = privateKeyPem.replace(/\\n/g, '\n');
-        privateKeyPem = privateKeyPem.replace(/\r/g, '');
-        privateKeyPem = privateKeyPem.trim();
+        // Robust PEM cleaning: extract base64, remove all whitespace, and rebuild clean PEM
+        const b64 = privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----/g, '')
+            .replace(/-----END PRIVATE KEY-----/g, '')
+            .replace(/\\n/g, '')
+            .replace(/\s+/g, '');
+        const cleanPem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----\n`;
 
         // Use jose library to sign JWT (uses Web Crypto / crypto.subtle, avoids OpenSSL 3.0 issues)
         const { importPKCS8, SignJWT } = await import('jose');
-        const privateKey = await importPKCS8(privateKeyPem, 'RS256');
+        const privateKey = await importPKCS8(cleanPem, 'RS256');
 
         const now = Math.floor(Date.now() / 1000);
         const jwt = await new SignJWT({
