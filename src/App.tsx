@@ -701,9 +701,15 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-20 items-center">
             <div className="order-2 lg:order-1">
-              <div className="grid grid-cols-2 gap-4">
-                <img src="https://picsum.photos/seed/ai1/400/500" className="rounded-3xl shadow-lg" alt="AI Teaching" referrerPolicy="no-referrer" />
-                <img src="https://picsum.photos/seed/ai2/400/500" className="rounded-3xl shadow-lg mt-12" alt="Mongolia Students" referrerPolicy="no-referrer" />
+              <div className="grid grid-cols-2 gap-4 sm:gap-6">
+                <div className="flex flex-col gap-4 sm:gap-6 translate-y-8">
+                  <img src="/ai_edu_1.png" className="rounded-3xl shadow-lg w-full object-cover aspect-[4/5] hover:scale-105 transition-transform duration-500" alt="Students learning AI" />
+                  <img src="/ai_edu_3.png" className="rounded-3xl shadow-lg w-full object-cover aspect-[4/5] hover:scale-105 transition-transform duration-500" alt="Kids coding with AI" />
+                </div>
+                <div className="flex flex-col gap-4 sm:gap-6 -translate-y-8">
+                  <img src="/ai_edu_2.png" className="rounded-3xl shadow-lg w-full object-cover aspect-[4/5] hover:scale-105 transition-transform duration-500" alt="Teacher explaining AI concepts" />
+                  <img src="/ai_edu_4.png" className="rounded-3xl shadow-lg w-full object-cover aspect-[4/5] hover:scale-105 transition-transform duration-500" alt="Students exploring AI models" />
+                </div>
               </div>
             </div>
             <div className="order-1 lg:order-2">
