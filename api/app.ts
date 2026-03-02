@@ -186,63 +186,91 @@ app.post("/api/export-google-sheets", async (req, res) => {
         return;
     }
 
-try {
-    let auth;
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
-        const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
-        const creds = JSON.parse(jsonStr);
-        const googleAuth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: creds.client_email,
-                private_key: creds.private_key,
-            },
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    try {
+        // Get credentials from base64 env var or individual env vars
+        let clientEmail: string;
+        let privateKeyPem: string;
+
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
+            const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
+            const creds = JSON.parse(jsonStr);
+            clientEmail = creds.client_email;
+            privateKeyPem = creds.private_key;
+        } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+            clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+            privateKeyPem = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        } else {
+            res.status(500).json({ success: false, error: "Google API credentials missing" });
+            return;
+        }
+
+        // Use jose library to sign JWT (uses Web Crypto / crypto.subtle, avoids OpenSSL 3.0 issues)
+        const { importPKCS8, SignJWT } = await import('jose');
+        const privateKey = await importPKCS8(privateKeyPem, 'RS256');
+
+        const now = Math.floor(Date.now() / 1000);
+        const jwt = await new SignJWT({
+            iss: clientEmail,
+            scope: 'https://www.googleapis.com/auth/spreadsheets',
+            aud: 'https://oauth2.googleapis.com/token',
+        })
+            .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+            .setIssuedAt(now)
+            .setExpirationTime(now + 3600)
+            .sign(privateKey);
+
+        // Exchange JWT for access token
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
         });
-        auth = await googleAuth.getClient();
-    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-        const pk = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-        const googleAuth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-                private_key: pk,
-            },
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-        });
-        auth = await googleAuth.getClient();
-    } else {
-        res.status(500).json({ success: false, error: "Google API credentials missing" });
-        return;
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.access_token) {
+            throw new Error(`Token exchange failed: ${JSON.stringify(tokenData)}`);
+        }
+
+        // Fetch submissions from database
+        const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
+        const rows = result.rows.map((row: any) => [
+            row.date,
+            row.name,
+            row.phone,
+            row.target,
+            row.amount,
+            row.message || '',
+            row.type === 'commitment' ? '정기약정' : '일시후원',
+            (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
+        ]);
+
+        const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
+        const values = [header, ...rows];
+
+        // Update Google Sheet using REST API directly
+        const sheetId = process.env.GOOGLE_SHEET_ID;
+        const sheetsResponse = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1?valueInputOption=RAW`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${tokenData.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ values }),
+            }
+        );
+
+        if (!sheetsResponse.ok) {
+            const errorText = await sheetsResponse.text();
+            throw new Error(`Sheets API error: ${sheetsResponse.status} ${errorText}`);
+        }
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error("Google Sheets Sync Error:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
-
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
-    const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
-
-    const rows = result.rows.map((row: any) => [
-        row.date,
-        row.name,
-        row.phone,
-        row.target,
-        row.amount,
-        row.message || '',
-        row.type === 'commitment' ? '정기약정' : '일시후원',
-        (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
-    ]);
-
-    const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
-    const values = [header, ...rows];
-
-    await sheets.spreadsheets.values.update({
-        spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: 'A1',
-        valueInputOption: 'RAW',
-        requestBody: { values },
-    });
-
-    res.json({ success: true });
-} catch (err: any) {
-    console.error("Google Sheets Sync Error:", err);
-    res.status(500).json({ success: false, error: err.message });
-}
 });
 
 export default app;
