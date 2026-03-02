@@ -125,7 +125,7 @@ export default function App() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    target: '' as '이유빈' | '이다예린' | '',
+    target: '이다예린' as '이유빈' | '이다예린' | '',
     amount: 50000,
     message: ''
   });
@@ -252,7 +252,6 @@ export default function App() {
 
 
   const bankInfo = {
-    '이유빈': '토스뱅크 1002-3836-7336 (예금주: 이유빈)',
     '이다예린': '토스뱅크 1001-1665-7239 (예금주: 이다예린)'
   };
 
@@ -806,29 +805,9 @@ export default function App() {
                   <Info className="w-4 h-4" /> {t.sponsorship.howTo}
                 </div>
                 <div className="mb-8 text-base whitespace-pre-line">{t.sponsorship.howToDesc}</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
                   <div className="bg-white p-6 rounded-3xl border border-[#5A5A40]/10 text-left shadow-sm group relative">
-                    <div className="font-bold text-[#5A5A40] mb-2 text-lg">{lang === 'ko' ? '이유빈' : 'Lee Yu-bin'}</div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-medium text-[#5A5A40]/80">
-                        토스뱅크 1002-3836-7336 <br />
-                        <span className="text-[10px] opacity-60">({lang === 'ko' ? '예금주:이유빈' : 'Account Holder: Lee Yu-bin'})</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText('100238367336');
-                          setCopiedId('yubin');
-                          setTimeout(() => setCopiedId(null), 2000);
-                        }}
-                        className="p-2 rounded-xl bg-[#5A5A40]/5 text-[#5A5A40] hover:bg-[#5A5A40] hover:text-white transition-all"
-                        title="복사하기"
-                      >
-                        {copiedId === 'yubin' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border border-[#5A5A40]/10 text-left shadow-sm group relative">
-                    <div className="font-bold text-[#5A5A40] mb-2 text-lg">{lang === 'ko' ? '이다예린' : 'Lee Da-yerin'}</div>
+                    <div className="font-bold text-[#5A5A40] mb-1 text-lg">{lang === 'ko' ? '이다예린 (프로젝트 회계 담당)' : 'Lee Da-yerin (Project Treasurer)'}</div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-sm font-medium text-[#5A5A40]/80">
                         토스뱅크 1001-1665-7239 <br />
@@ -952,31 +931,12 @@ export default function App() {
 
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-widest text-[#5A5A40]/50 mb-2">{t.modal.targetLabel}</label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, target: '이유빈' })}
-                          className={cn(
-                            "py-4 rounded-2xl border font-medium transition-all",
-                            formData.target === '이유빈'
-                              ? "bg-[#5A5A40] text-white border-[#5A5A40]"
-                              : "bg-white text-[#5A5A40] border-[#5A5A40]/10 hover:border-[#5A5A40]/30"
-                          )}
+                      <div className="grid grid-cols-1 gap-4">
+                        <div
+                          className="py-4 rounded-2xl border font-medium bg-[#5A5A40] text-white border-[#5A5A40] text-center"
                         >
-                          이유빈
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, target: '이다예린' })}
-                          className={cn(
-                            "py-4 rounded-2xl border font-medium transition-all",
-                            formData.target === '이다예린'
-                              ? "bg-[#5A5A40] text-white border-[#5A5A40]"
-                              : "bg-white text-[#5A5A40] border-[#5A5A40]/10 hover:border-[#5A5A40]/30"
-                          )}
-                        >
-                          이다예린
-                        </button>
+                          이유빈 & 이다예린
+                        </div>
                       </div>
                     </div>
 
@@ -1067,8 +1027,7 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
-                        const accountNum = formData.target === '이유빈' ? '100238367336' : '100116657239';
-                        navigator.clipboard.writeText(accountNum);
+                        navigator.clipboard.writeText('100116657239');
                         setCopiedId('success');
                         setTimeout(() => setCopiedId(null), 2000);
                       }}
