@@ -214,13 +214,12 @@ export function Admin({
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs text-[#5A5A40]/40 uppercase tracking-widest border-b border-[#5A5A40]/10">
                     <tr>
-                      <th className="px-4 py-4">날짜</th>
-                      <th className="px-4 py-4">성함</th>
-                      <th className="px-4 py-4">연락처</th>
-                      <th className="px-4 py-4">대상</th>
-                      <th className="px-4 py-4">금액</th>
-                      <th className="px-4 py-4">메시지</th>
-                      <th className="px-4 py-4">관리</th>
+                      <th className="px-4 py-4 w-[120px] whitespace-nowrap">날짜</th>
+                      <th className="px-4 py-4 w-[100px] whitespace-nowrap">이름</th>
+                      <th className="px-4 py-4 w-[130px] whitespace-nowrap">연락처</th>
+                      <th className="px-4 py-4 w-[120px] whitespace-nowrap">금액</th>
+                      <th className="px-4 py-4 min-w-[300px]">메시지</th>
+                      <th className="px-4 py-4 w-[100px] whitespace-nowrap">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#5A5A40]/5">
@@ -232,7 +231,7 @@ export function Admin({
                       if (filtered.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={7} className="px-4 py-20 text-center text-[#5A5A40]/40">
+                            <td colSpan={6} className="px-4 py-20 text-center text-[#5A5A40]/40">
                               {adminTab === 'trash' ? '휴지통이 비어 있습니다.' : '해당 후원 데이터가 없습니다.'}
                             </td>
                           </tr>
@@ -241,17 +240,12 @@ export function Admin({
 
                       return filtered.map((s) => (
                         <tr key={s.id} className="hover:bg-[#5A5A40]/5 transition-colors">
-                          <td className="px-4 py-4 whitespace-nowrap">{s.date}</td>
-                          <td className="px-4 py-4 font-bold">{s.name}</td>
-                          <td className="px-4 py-4">{s.phone}</td>
-                          <td className="px-4 py-4">
-                            <span className="px-2 py-1 bg-[#5A5A40]/10 rounded-lg text-[10px] font-bold">
-                              {s.target}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 font-serif">{s.amount.toLocaleString()}원</td>
-                          <td className="px-4 py-4 max-w-xs truncate">{s.message || '-'}</td>
-                          <td className="px-4 py-4">
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-500">{s.date ? s.date.split('T')[0] : ''}</td>
+                          <td className="px-4 py-4 font-bold whitespace-nowrap">{s.name}</td>
+                          <td className="px-4 py-4 whitespace-nowrap">{s.phone}</td>
+                          <td className="px-4 py-4 font-serif whitespace-nowrap">{s.amount.toLocaleString()}원</td>
+                          <td className="px-4 py-4 text-gray-700">{s.message || '-'}</td>
+                          <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex gap-3">
                               <button
                                 onClick={() => setSelectedSubmission(s)}
