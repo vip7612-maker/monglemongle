@@ -186,59 +186,63 @@ app.post("/api/export-google-sheets", async (req, res) => {
         return;
     }
 
-    try {
-        let auth;
-        console.log('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 exists:', !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64);
-        console.log('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 length:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64?.length);
-        console.log('GOOGLE_PRIVATE_KEY exists:', !!process.env.GOOGLE_PRIVATE_KEY);
-
-        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
-            console.log('Using BASE64 approach');
-            const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
-            const creds = JSON.parse(jsonStr);
-            console.log('Decoded email:', creds.client_email);
-            console.log('Private key starts:', creds.private_key?.substring(0, 30));
-            console.log('Private key length:', creds.private_key?.length);
-            auth = new google.auth.JWT(creds.client_email, undefined, creds.private_key, ['https://www.googleapis.com/auth/spreadsheets']);
-        } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-            console.log('Using individual env vars approach');
-            const pk = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-            auth = new google.auth.JWT(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, undefined, pk, ['https://www.googleapis.com/auth/spreadsheets']);
-        } else {
-            res.status(500).json({ success: false, error: "Google API credentials missing" });
-            return;
-        }
-
-
-        const sheets = google.sheets({ version: 'v4', auth });
-        const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
-
-        const rows = result.rows.map((row: any) => [
-            row.date,
-            row.name,
-            row.phone,
-            row.target,
-            row.amount,
-            row.message || '',
-            row.type === 'commitment' ? '정기약정' : '일시후원',
-            (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
-        ]);
-
-        const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
-        const values = [header, ...rows];
-
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'A1',
-            valueInputOption: 'RAW',
-            requestBody: { values },
+try {
+    let auth;
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
+        const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
+        const creds = JSON.parse(jsonStr);
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: creds.client_email,
+                private_key: creds.private_key,
+            },
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
-
-        res.json({ success: true });
-    } catch (err: any) {
-        console.error("Google Sheets Sync Error:", err);
-        res.status(500).json({ success: false, error: err.message });
+        auth = await googleAuth.getClient();
+    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+        const pk = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+                private_key: pk,
+            },
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+        auth = await googleAuth.getClient();
+    } else {
+        res.status(500).json({ success: false, error: "Google API credentials missing" });
+        return;
     }
+
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
+
+    const rows = result.rows.map((row: any) => [
+        row.date,
+        row.name,
+        row.phone,
+        row.target,
+        row.amount,
+        row.message || '',
+        row.type === 'commitment' ? '정기약정' : '일시후원',
+        (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
+    ]);
+
+    const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
+    const values = [header, ...rows];
+
+    await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: 'A1',
+        valueInputOption: 'RAW',
+        requestBody: { values },
+    });
+
+    res.json({ success: true });
+} catch (err: any) {
+    console.error("Google Sheets Sync Error:", err);
+    res.status(500).json({ success: false, error: err.message });
+}
 });
 
 export default app;
