@@ -212,9 +212,23 @@ app.post("/api/export-google-sheets", async (req, res) => {
 
         const cleanPem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----\n`;
 
-        // Use jose library to sign JWT (uses Web Crypto / crypto.subtle, avoids OpenSSL 3.0 issues)
+        // Use jose library to sign JWT
         const { importPKCS8, SignJWT } = await import('jose');
-        const privateKey = await importPKCS8(cleanPem, 'RS256');
+        let privateKey;
+        try {
+            privateKey = await importPKCS8(cleanPem, 'RS256');
+        } catch (e: any) {
+            console.error("DEBUG KEY ERROR:", e);
+            res.status(500).json({
+                success: false,
+                error: e.message,
+                b64Length: b64.length,
+                cleanPem: cleanPem,
+                rawKeyStart: privateKeyPem.substring(0, 100),
+                rawKeyEnd: privateKeyPem.substring(privateKeyPem.length - 100)
+            });
+            return;
+        }
 
         const now = Math.floor(Date.now() / 1000);
         const jwt = await new SignJWT({
