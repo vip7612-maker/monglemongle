@@ -72,7 +72,7 @@ app.get("/api/submissions", async (req, res) => {
             const allSubmissions = result.rows.map((row: any) => ({
                 ...row,
                 id: Number(row.id),
-                isDeleted: row.isdeleted === 1 || row.isdeleted === true
+                isDeleted: row.isDeleted === 1 || row.isDeleted === true || row.isdeleted === 1 || row.isdeleted === true
             }));
             res.json(allSubmissions);
         } catch (err) {
@@ -145,19 +145,27 @@ app.post("/api/admin_action", async (req, res) => {
     }
 
     try {
+        const targetId = Number(data.id);
+        console.log(`Admin action: ${data.type} on id=${targetId}`);
+
         if (data.type === 'delete') {
-            await sql.execute({ sql: `UPDATE submissions SET isDeleted = 1 WHERE id = ?`, args: [data.id] });
+            const updateResult = await sql.execute({ sql: `UPDATE submissions SET "isDeleted" = 1 WHERE id = ?`, args: [targetId] });
+            console.log(`Delete result rowsAffected:`, updateResult.rowsAffected);
+            if (updateResult.rowsAffected === 0) {
+                // Try without quotes (lowercase column)
+                await sql.execute({ sql: `UPDATE submissions SET isdeleted = 1 WHERE id = ?`, args: [targetId] });
+            }
         } else if (data.type === 'restore') {
-            await sql.execute({ sql: `UPDATE submissions SET isDeleted = 0 WHERE id = ?`, args: [data.id] });
+            await sql.execute({ sql: `UPDATE submissions SET "isDeleted" = 0 WHERE id = ?`, args: [targetId] });
         } else if (data.type === 'permanent_delete') {
-            await sql.execute({ sql: `DELETE FROM submissions WHERE id = ?`, args: [data.id] });
+            await sql.execute({ sql: `DELETE FROM submissions WHERE id = ?`, args: [targetId] });
         }
 
         const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
         const allSubmissions = result.rows.map((row: any) => ({
             ...row,
             id: Number(row.id),
-            isDeleted: row.isdeleted === 1 || row.isdeleted === true
+            isDeleted: row.isDeleted === 1 || row.isDeleted === true || row.isdeleted === 1 || row.isdeleted === true
         }));
         res.json(allSubmissions);
     } catch (err) {
