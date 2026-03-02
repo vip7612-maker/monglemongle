@@ -239,17 +239,16 @@ app.post("/api/export-google-sheets", async (req, res) => {
         // Fetch submissions from database
         const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
         const rows = result.rows.map((row: any) => [
-            row.date,
+            row.date ? row.date.split('T')[0] : '',
             row.name,
             row.phone,
-            row.target,
             row.amount,
             row.message || '',
             row.type === 'commitment' ? '정기약정' : '일시후원',
             (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
         ]);
 
-        const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
+        const header = ["날짜", "이름", "연락처", "금액", "메시지", "유형", "상태"];
         const values = [header, ...rows];
 
         // Update Google Sheet using REST API directly
@@ -270,6 +269,32 @@ app.post("/api/export-google-sheets", async (req, res) => {
             const errorText = await sheetsResponse.text();
             throw new Error(`Sheets API error: ${sheetsResponse.status} ${errorText}`);
         }
+
+        // Auto-resize columns in Google Sheets
+        await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${tokenData.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    requests: [
+                        {
+                            autoResizeDimensions: {
+                                dimensions: {
+                                    sheetId: 0,
+                                    dimension: 'COLUMNS',
+                                    startIndex: 0,
+                                    endIndex: 7
+                                }
+                            }
+                        }
+                    ]
+                }),
+            }
+        );
 
         res.json({ success: true });
     } catch (err: any) {

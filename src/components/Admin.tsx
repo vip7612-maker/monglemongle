@@ -26,16 +26,26 @@ export function Admin({
     }
 
     const dataToExport = filtered.map((s: any) => ({
-      "날짜": s.date,
-      "성함": s.name,
+      "날짜": s.date ? s.date.split('T')[0] : '',
+      "이름": s.name,
       "연락처": s.phone,
-      "후원대상": s.target,
       "금액": s.amount,
       "메시지": s.message || "",
       "유형": s.type === 'commitment' ? '정기약정' : '일시후원'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+    // Auto-resize columns
+    worksheet['!cols'] = [
+      { wch: 12 }, // 날짜 
+      { wch: 10 }, // 이름
+      { wch: 15 }, // 연락처
+      { wch: 12 }, // 금액
+      { wch: 50 }, // 메시지
+      { wch: 10 }, // 유형
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sponsors");
     XLSX.writeFile(workbook, `mongle_sponsors_${adminTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
