@@ -95,6 +95,7 @@ export default function App() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [adminTab, setAdminTab] = useState<'commitment' | 'one-time' | 'trash'>('commitment');
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [showAllSponsorsModal, setShowAllSponsorsModal] = useState(false);
 
   const heroImages = [
     '/mongolia_green_steppe.png',
@@ -556,7 +557,10 @@ export default function App() {
                 ))}
               </div>
               <div className="p-4 bg-[#fdfcf8] text-center">
-                <button className="text-xs font-bold text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors uppercase tracking-widest">
+                <button
+                  onClick={() => setShowAllSponsorsModal(true)}
+                  className="text-xs font-bold text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors uppercase tracking-widest"
+                >
                   {t.funding.viewAll}
                 </button>
               </div>
@@ -827,7 +831,7 @@ export default function App() {
                 <div className="mb-8 text-base whitespace-pre-line">{t.sponsorship.howToDesc}</div>
                 <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
                   <div className="bg-white p-6 rounded-3xl border border-[#5A5A40]/10 text-left shadow-sm group relative">
-                    <div className="font-bold text-[#5A5A40] mb-1 text-lg">{lang === 'ko' ? '이다예린 (프로젝트 회계 담당)' : 'Lee Da-yerin (Project Treasurer)'}</div>
+                    <div className="font-bold text-[#5A5A40] mb-1 text-lg">{lang === 'ko' ? '이다예린 (프로젝트 회계/행정/교육보조)' : 'Lee Da-yerin (Project Accounting/Admin/Teaching Assistant)'}</div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-sm font-medium text-[#5A5A40]/80">
                         토스뱅크 1001-1665-7239 <br />
@@ -1071,6 +1075,63 @@ export default function App() {
                   </button>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* All Sponsors Modal */}
+      <AnimatePresence>
+        {showAllSponsorsModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="bg-[#5A5A40] p-6 text-white text-center flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
+                <h2 className="font-serif text-2xl mb-1 relative z-10">
+                  {lang === 'ko' ? '함께하는 분들' : 'Our Sponsors'}
+                </h2>
+                <p className="text-white/80 text-sm relative z-10">
+                  {allSponsors.length}{lang === 'ko' ? '명의 소중한 마음이 모였습니다' : ' people are with us'}
+                </p>
+              </div>
+              <div className="overflow-y-auto p-6 flex-1 custom-scrollbar bg-[#fdfcf8]">
+                <div className="divide-y divide-[#5A5A40]/10">
+                  {allSponsors.map((sponsor, idx) => (
+                    <div key={idx} className="py-4 flex justify-between items-center group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 rounded-full bg-white border border-[#5A5A40]/20 flex items-center justify-center text-[#5A5A40] text-xs font-bold shadow-sm">
+                          {idx + 1}
+                        </div>
+                        <span className="font-medium text-[#5A5A40]">
+                          {maskName(sponsor.name)} {lang === 'ko' ? '님' : ''}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-[#5A5A40]">{sponsor.amount.toLocaleString()}원</div>
+                        <div className="text-[10px] text-[#5A5A40]/40 uppercase tracking-widest">{sponsor.date}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {allSponsors.length === 0 && (
+                    <div className="text-center py-10 text-[#5A5A40]/50 text-sm">
+                      {lang === 'ko' ? '아직 후원 내역이 없습니다.' : 'No sponsors yet.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="p-6 bg-white border-t border-[#5A5A40]/10 flex-shrink-0">
+                <button
+                  onClick={() => setShowAllSponsorsModal(false)}
+                  className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-bold hover:bg-[#4a4a35] transition-colors"
+                >
+                  {t.modal.close}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
