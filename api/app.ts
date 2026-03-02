@@ -181,30 +181,24 @@ app.post("/api/export-google-sheets", async (req, res) => {
         return;
     }
 
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
-        res.status(500).json({ success: false, error: "Google API credentials missing in environment variables" });
+    if (!process.env.GOOGLE_SHEET_ID) {
+        res.status(500).json({ success: false, error: "GOOGLE_SHEET_ID missing" });
         return;
     }
 
     try {
-        // Clean private key: handle various newline encodings from env vars
-        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-        // Replace literal \n strings with actual newlines
-        privateKey = privateKey.replace(/\\n/g, '\n');
-        // Also handle double-escaped \\n
-        privateKey = privateKey.replace(/\\\\n/g, '\n');
-        // Remove surrounding quotes if present
-        privateKey = privateKey.replace(/^["']|["']$/g, '');
-
-        console.log('Private key starts with:', privateKey.substring(0, 30));
-        console.log('Private key ends with:', privateKey.substring(privateKey.length - 30));
-
-        const auth = new google.auth.JWT(
-            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            undefined,
-            privateKey,
-            ['https://www.googleapis.com/auth/spreadsheets']
-        );
+        let auth;
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
+            const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
+            const creds = JSON.parse(jsonStr);
+            auth = new google.auth.JWT(creds.client_email, undefined, creds.private_key, ['https://www.googleapis.com/auth/spreadsheets']);
+        } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+            const pk = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+            auth = new google.auth.JWT(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, undefined, pk, ['https://www.googleapis.com/auth/spreadsheets']);
+        } else {
+            res.status(500).json({ success: false, error: "Google API credentials missing" });
+            return;
+        }
 
         const sheets = google.sheets({ version: 'v4', auth });
         const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
@@ -217,7 +211,7 @@ app.post("/api/export-google-sheets", async (req, res) => {
             row.amount,
             row.message || '',
             row.type === 'commitment' ? '정기약정' : '일시후원',
-            row.isdeleted ? '삭제됨' : '활성'
+            (row.isDeleted || row.isdeleted) ? '삭제됨' : '활성'
         ]);
 
         const header = ["날짜", "성함", "연락처", "후원대상", "금액", "메시지", "유형", "상태"];
