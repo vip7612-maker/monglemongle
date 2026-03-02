@@ -188,17 +188,27 @@ app.post("/api/export-google-sheets", async (req, res) => {
 
     try {
         let auth;
+        console.log('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 exists:', !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64);
+        console.log('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 length:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64?.length);
+        console.log('GOOGLE_PRIVATE_KEY exists:', !!process.env.GOOGLE_PRIVATE_KEY);
+
         if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
+            console.log('Using BASE64 approach');
             const jsonStr = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf-8');
             const creds = JSON.parse(jsonStr);
+            console.log('Decoded email:', creds.client_email);
+            console.log('Private key starts:', creds.private_key?.substring(0, 30));
+            console.log('Private key length:', creds.private_key?.length);
             auth = new google.auth.JWT(creds.client_email, undefined, creds.private_key, ['https://www.googleapis.com/auth/spreadsheets']);
         } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+            console.log('Using individual env vars approach');
             const pk = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
             auth = new google.auth.JWT(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, undefined, pk, ['https://www.googleapis.com/auth/spreadsheets']);
         } else {
             res.status(500).json({ success: false, error: "Google API credentials missing" });
             return;
         }
+
 
         const sheets = google.sheets({ version: 'v4', auth });
         const result = await sql.execute(`SELECT * FROM submissions ORDER BY id DESC`);
