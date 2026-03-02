@@ -187,10 +187,22 @@ app.post("/api/export-google-sheets", async (req, res) => {
     }
 
     try {
+        // Clean private key: handle various newline encodings from env vars
+        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+        // Replace literal \n strings with actual newlines
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        // Also handle double-escaped \\n
+        privateKey = privateKey.replace(/\\\\n/g, '\n');
+        // Remove surrounding quotes if present
+        privateKey = privateKey.replace(/^["']|["']$/g, '');
+
+        console.log('Private key starts with:', privateKey.substring(0, 30));
+        console.log('Private key ends with:', privateKey.substring(privateKey.length - 30));
+
         const auth = new google.auth.JWT(
             process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
             undefined,
-            process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            privateKey,
             ['https://www.googleapis.com/auth/spreadsheets']
         );
 
